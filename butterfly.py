@@ -143,12 +143,8 @@ def random_permutation(size: int) -> Permutation:
     return dict(enumerate(numbers))
 
 
-def _is_bot(hi: int, choice: Choice) -> bool:
-    return bool(hi ^ choice.value)
-
-
-def _choice_for(bot: bool, hi: int) -> Choice:
-    return Choice(int(bot) ^ hi)
+def _choice_for(bot: int, hi: int) -> Choice:
+    return Choice(bot ^ hi)
 
 
 def route_permutation(size: int, permutation: Permutation) -> Routing:
@@ -158,51 +154,47 @@ def route_permutation(size: int, permutation: Permutation) -> Routing:
 
     def go(size: int, permutation: Permutation, base_x: int, base_y: int):
         if size == 1:
-            print('last', base_y, permutation)
             choice = Choice.Pass if permutation[0] == 0 else Choice.Swap
             routing.choices[base_x][base_y] = choice
             return
-        perms: List[Permutation] = [dict(), dict()]
+
         e = 1 << (size - 1)
         mask = e - 1
-        to_route = set(range(1 << size))
 
-        while to_route:
-            x = to_route.pop()
+        perms: List[Permutation] = [dict(), dict()]
+
+        colors: Dict[int, int] = dict()
+
+        for x in range(1 << size):
+            # Follow a coloring path starting from x
+            while x not in colors:
+                colors[x] = 0
+                x ^= e
+                colors[x] = 1
+                x = permutation[e ^ permutation[x]]
+
+        for x in range(1 << size):
             x_hi = x >> (size - 1)
             x_lo = x & mask
 
             y = permutation[x]
             y_hi = y >> (size - 1)
             y_lo = y & mask
-            print(routing)
-            print(perms)
-            print(x, y)
+
+            color = colors[x]
 
             front = base_x
             back = base_x + 2 * (size - 1)
 
-            x_bot = None
-            if (x_choice := routing.choices[front][base_y + x_lo]) is not None:
-                x_bot = _is_bot(x_hi, x_choice)
-            if (y_choice := routing.choices[back][base_y + y_lo]) is not None:
-                y_bot = _is_bot(y_hi, y_choice)
-                print(x_bot, y_bot)
-                assert x_bot is None or x_bot == y_bot
-                x_bot = y_bot
-            if x_bot is None:
-                x_bot = False
-            routing.choices[front][base_y + x_lo] = _choice_for(x_bot, x_hi)
-            routing.choices[back][base_y + y_lo] = _choice_for(x_bot, y_hi)
-            # Insert into the permutations for one of the sub-networks
-            perms[int(x_bot)][x_lo] = y_lo
+            routing.choices[front][base_y + x_lo] = _choice_for(color, x_hi)
+            routing.choices[back][base_y + y_lo] = _choice_for(color, y_hi)
+            perms[color][x_lo] = y_lo
 
         queue.append((size - 1, perms[0], base_x + 1, base_y))
         y_delta = 1 << (size - 2)
         queue.append((size - 1, perms[1], base_x + 1, base_y + y_delta))
 
     while queue:
-        print("queue", queue)
         go(*queue.pop())
 
     return routing
