@@ -1,7 +1,7 @@
 import random
 from dataclasses import dataclass
 from enum import Enum
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, Iterator, List, Optional, Tuple
 
 SLATE = "#334155"
 PINK = "#EC4899"
@@ -62,6 +62,9 @@ class RoutingDrawer:
         return self._svg.output()
 
 
+Permutation = Dict[int, int]
+
+
 class Choice(Enum):
     Pass = 0
     Swap = 1
@@ -96,12 +99,7 @@ class Routing:
     def width(self) -> int:
         return 1 << (self.size - 1)
 
-    def draw_svg(self, node_diameter: float) -> str:
-        drawer = RoutingDrawer(self.depth, 1 << self.size, node_diameter)
-        for col in range(self.depth + 1):
-            for row in range(1 << self.size):
-                drawer.node((col, row))
-
+    def _ordered_choices(self) -> Iterator[Tuple[int, Choice, int, int]]:
         middle_i = self.size
         reverse = False
         for i, col_choices in enumerate(self.choices):
@@ -121,17 +119,31 @@ class Routing:
                 back = mask_back & j
                 a = (front << 1) | back
                 b = (front << 1) | middle | back
-                if choice == Choice.Swap:
-                    drawer.connection(PINK, (i, a), (i + 1, b))
-                    drawer.connection(PINK, (i, b), (i + 1, a))
-                else:
-                    drawer.connection(SLATE, (i, a), (i + 1, a))
-                    drawer.connection(SLATE, (i, b), (i + 1, b))
+                yield (i, choice, a, b)
+
+    def permutation(self) -> Permutation:
+        xs = list(range(1 << self.size))
+        ys = xs[:]
+        for i, choice, a, b in self._ordered_choices():
+            if choice == Choice.Swap:
+                ys[a], ys[b] = ys[b], ys[a]
+        return dict(zip(ys, xs))
+
+    def draw_svg(self, node_diameter: float) -> str:
+        drawer = RoutingDrawer(self.depth, 1 << self.size, node_diameter)
+        for col in range(self.depth + 1):
+            for row in range(1 << self.size):
+                drawer.node((col, row))
+
+        for i, choice, a, b in self._ordered_choices():
+            if choice == Choice.Swap:
+                drawer.connection(PINK, (i, a), (i + 1, b))
+                drawer.connection(PINK, (i, b), (i + 1, a))
+            else:
+                drawer.connection(SLATE, (i, a), (i + 1, a))
+                drawer.connection(SLATE, (i, b), (i + 1, b))
 
         return drawer.output()
-
-
-Permutation = Dict[int, int]
 
 
 def random_permutation(size: int) -> Permutation:
@@ -150,7 +162,8 @@ def _choice_for(bot: int, hi: int) -> Choice:
 def route_permutation(size: int, permutation: Permutation) -> Routing:
     routing = Routing.sized(size)
     queue: List[Tuple[int, Permutation, int, int]] = [
-        (size, permutation, 0, 0)]
+        (size, permutation, 0, 0)
+    ]
 
     def go(size: int, permutation: Permutation, base_x: int, base_y: int):
         if size == 1:
@@ -163,8 +176,8 @@ def route_permutation(size: int, permutation: Permutation) -> Routing:
 
         perms: List[Permutation] = [dict(), dict()]
 
+        # First, assign a "color" (side) for each input node
         colors: Dict[int, int] = dict()
-
         for x in range(1 << size):
             # Follow a coloring path starting from x
             while x not in colors:
@@ -173,6 +186,7 @@ def route_permutation(size: int, permutation: Permutation) -> Routing:
                 colors[x] = 1
                 x = permutation[e ^ permutation[x]]
 
+        # With these consistent colors, we can now just assign routes directly.
         for x in range(1 << size):
             x_hi = x >> (size - 1)
             x_lo = x & mask
@@ -198,3 +212,11 @@ def route_permutation(size: int, permutation: Permutation) -> Routing:
         go(*queue.pop())
 
     return routing
+
+
+def fuzz(size: int, rounds: int = 100):
+    for _ in range(rounds):
+        perm0 = random_permutation(size)
+        perm1 = route_permutation(size, perm0).permutation()
+        print(perm0, perm1)
+        assert perm0 == perm1
