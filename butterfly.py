@@ -105,8 +105,31 @@ class Routing:
         for col in range(self.depth + 1):
             for row in range(1 << self.size):
                 drawer.node((col, row))
-        drawer.connection(SLATE, (0, 0), (1, 1))
-        drawer.connection(PINK, (0, 1), (1, 0))
+
+        middle_i = self.size
+        reverse = False
+        for i, col_choices in enumerate(self.choices):
+            if reverse:
+                middle_i += 1
+            else:
+                middle_i -= 1
+                if middle_i == 0:
+                    reverse = True
+            middle = 1 << middle_i
+            mask_back = middle - 1
+            mask_front = ((1 << (self.size - 1)) - 1) ^ mask_back
+            for j, choice in enumerate(col_choices):
+                front = mask_front & j
+                back = mask_back & j
+                a = (front << 1) | back
+                b = (front << 1) | middle | back
+                if choice == Choice.Swap:
+                    drawer.connection(PINK, (i, a), (i + 1, b))
+                    drawer.connection(PINK, (i, b), (i + 1, a))
+                else:
+                    drawer.connection(SLATE, (i, a), (i + 1, a))
+                    drawer.connection(SLATE, (i, b), (i + 1, b))
+
         return drawer.output()
 
 
