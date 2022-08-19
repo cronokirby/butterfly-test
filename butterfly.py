@@ -146,3 +146,20 @@ def random_permutation(size: int) -> Permutation:
         out[x] = y
         out[y] = x
     return out
+
+
+def route_permutation(size: int, permutation: Permutation) -> Routing:
+    routing = Routing.sized(size)
+    queue = [(size, permutation, 0, 0)]
+
+    def go(size: int, permutation: Permutation, base_x: int, base_y: int):
+        if size == 1:
+            choice = Choice.Pass if permutation[0] == 0 else Choice.Swap
+            routing.choices[base_x][base_y] = choice
+            return
+        raise NotImplementedError
+
+    while queue:
+        go(*queue.pop())
+
+    return routing
