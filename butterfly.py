@@ -148,16 +148,58 @@ def random_permutation(size: int) -> Permutation:
     return out
 
 
+def _is_bot(hi: int, choice: Choice) -> bool:
+    return bool(hi ^ choice.value)
+
+
+def _choice_for(bot: bool, hi: int) -> Choice:
+    return Choice(int(bot) ^ hi)
+
+
 def route_permutation(size: int, permutation: Permutation) -> Routing:
     routing = Routing.sized(size)
-    queue = [(size, permutation, 0, 0)]
+    queue: List[Tuple[int, Permutation, int, int]] = [
+        (size, permutation, 0, 0)]
 
     def go(size: int, permutation: Permutation, base_x: int, base_y: int):
         if size == 1:
             choice = Choice.Pass if permutation[0] == 0 else Choice.Swap
             routing.choices[base_x][base_y] = choice
             return
-        raise NotImplementedError
+        perms: List[Permutation] = [dict(), dict()]
+        e = 1 << (size - 1)
+        mask = e - 1
+        to_route = set(range(1 << size))
+
+        while to_route:
+            x = to_route.pop()
+            x_hi = x >> (size - 1)
+            x_lo = x & mask
+
+            y = permutation[x]
+            y_hi = y >> (size - 1)
+            y_lo = y & mask
+
+            front = base_x
+            back = base_x + 2 * (size - 1)
+
+            x_bot = None
+            if (x_choice := routing.choices[front][x_lo]) is not None:
+                x_bot = _is_bot(x_hi, x_choice)
+            if (y_choice := routing.choices[back][y_lo]) is not None:
+                y_bot = _is_bot(y_hi, y_choice)
+                assert x_bot is None or x_bot == y_bot
+                x_bot = y_bot
+            if x_bot is None:
+                x_bot = False
+            routing.choices[front][x_lo] = _choice_for(x_bot, x_hi)
+            routing.choices[back][y_lo] = _choice_for(x_bot, y_hi)
+            # Insert into the permutations for one of the sub-networks
+            perms[int(x_bot)][x_lo] = y_lo
+
+        queue.append((size - 1, perms[1], base_x + 1, base_y))
+        y_delta = 1 << (size - 2)
+        queue.append((size - 1, perms[0], base_x + 1, base_y + y_delta))
 
     while queue:
         go(*queue.pop())
