@@ -15,7 +15,8 @@ class CanvasConfig:
 
 class SVGDrawer:
     def __init__(self, canvas: CanvasConfig):
-        self._buf = f'<svg width="{canvas.width}" height="{canvas.height}" viewBox="0 0 1 1">'
+        self._canvas = canvas
+        self._buf = f'<svg width="{canvas.width}" height="{canvas.height}">'
 
     def circle(self, x: float, y: float, r: float):
         self._buf += f'<circle cx="{x}" cy="{y}" r="{r}"/>'
@@ -30,25 +31,20 @@ class SVGDrawer:
 
 class RoutingDrawer:
     def __init__(self, depth: int, width: int, node_diameter: float):
-        # Depth + 1 node layers, depth routing layers
-        self._slice_width = 1 / (2 * depth + 1)
-        # So that nodes occupy 1 / 2 a slice
-        self._node_radius = self._slice_width / 4
+        self._slice_width = 2 * node_diameter
+        self._slice_height = self._slice_width
+        canvas_width = (2 * depth + 3) * self._slice_width
+        canvas_height = (2 + width) * self._slice_height
+        self._node_radius = node_diameter / 2
         self._line_width = self._node_radius / 4
-        self._slice_height = 1 / width
-
-        # Get the height of the canvas based on the absolute node diameter size
-        canvas_width = 2 * node_diameter / self._slice_width
-        # Similar trick for the height, since a vertical slice is 2 nodes in width
-        canvas_height = 2 * node_diameter / self._slice_height
 
         self._svg = SVGDrawer(CanvasConfig(
             width=canvas_width, height=canvas_height)
         )
 
     def _node_center(self, pos: Tuple[int, int]) -> Tuple[float, float]:
-        x = self._slice_width * (2 * pos[0]) + self._slice_width / 2
-        y = self._slice_height * pos[1] + self._slice_height / 2
+        x = self._slice_width * (2 * pos[0] + 1) + self._slice_width / 2
+        y = self._slice_height * (pos[1] + 1) + self._slice_height / 2
         return (x, y)
 
     def node(self, pos: Tuple[int, int]):
