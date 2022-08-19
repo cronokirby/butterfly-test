@@ -119,6 +119,8 @@ class Routing:
             mask_back = middle - 1
             mask_front = ((1 << (self.size - 1)) - 1) ^ mask_back
             for j, choice in enumerate(col_choices):
+                if choice is None:
+                    continue
                 front = mask_front & j
                 back = mask_back & j
                 a = (front << 1) | back
