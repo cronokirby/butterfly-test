@@ -183,17 +183,17 @@ def route_permutation(size: int, permutation: Permutation) -> Routing:
             back = base_x + 2 * (size - 1)
 
             x_bot = None
-            if (x_choice := routing.choices[front][x_lo]) is not None:
+            if (x_choice := routing.choices[front][base_y + x_lo]) is not None:
                 x_bot = _is_bot(x_hi, x_choice)
-            if (y_choice := routing.choices[back][y_lo]) is not None:
+            if (y_choice := routing.choices[back][base_y + y_lo]) is not None:
                 y_bot = _is_bot(y_hi, y_choice)
                 print(x_bot, y_bot)
                 assert x_bot is None or x_bot == y_bot
                 x_bot = y_bot
             if x_bot is None:
                 x_bot = False
-            routing.choices[front][x_lo] = _choice_for(x_bot, x_hi)
-            routing.choices[back][y_lo] = _choice_for(x_bot, y_hi)
+            routing.choices[front][base_y + x_lo] = _choice_for(x_bot, x_hi)
+            routing.choices[back][base_y + y_lo] = _choice_for(x_bot, y_hi)
             # Insert into the permutations for one of the sub-networks
             perms[int(x_bot)][x_lo] = y_lo
 
@@ -202,6 +202,7 @@ def route_permutation(size: int, permutation: Permutation) -> Routing:
         queue.append((size - 1, perms[1], base_x + 1, base_y + y_delta))
 
     while queue:
+        print("queue", queue)
         go(*queue.pop())
 
     return routing
