@@ -138,14 +138,9 @@ def random_permutation(size: int) -> Permutation:
     """Generate a random permutation with 2^size elements.
     """
     count = 1 << size
-    out = dict()
-    for x in range(count):
-        if x in out:
-            continue
-        y = random.randrange(count)
-        out[x] = y
-        out[y] = x
-    return out
+    numbers = list(range(count))
+    random.shuffle(numbers)
+    return dict(enumerate(numbers))
 
 
 def _is_bot(hi: int, choice: Choice) -> bool:
@@ -163,6 +158,7 @@ def route_permutation(size: int, permutation: Permutation) -> Routing:
 
     def go(size: int, permutation: Permutation, base_x: int, base_y: int):
         if size == 1:
+            print('last', base_y, permutation)
             choice = Choice.Pass if permutation[0] == 0 else Choice.Swap
             routing.choices[base_x][base_y] = choice
             return
@@ -179,6 +175,9 @@ def route_permutation(size: int, permutation: Permutation) -> Routing:
             y = permutation[x]
             y_hi = y >> (size - 1)
             y_lo = y & mask
+            print(routing)
+            print(perms)
+            print(x, y)
 
             front = base_x
             back = base_x + 2 * (size - 1)
@@ -188,6 +187,7 @@ def route_permutation(size: int, permutation: Permutation) -> Routing:
                 x_bot = _is_bot(x_hi, x_choice)
             if (y_choice := routing.choices[back][y_lo]) is not None:
                 y_bot = _is_bot(y_hi, y_choice)
+                print(x_bot, y_bot)
                 assert x_bot is None or x_bot == y_bot
                 x_bot = y_bot
             if x_bot is None:
@@ -197,9 +197,9 @@ def route_permutation(size: int, permutation: Permutation) -> Routing:
             # Insert into the permutations for one of the sub-networks
             perms[int(x_bot)][x_lo] = y_lo
 
-        queue.append((size - 1, perms[1], base_x + 1, base_y))
+        queue.append((size - 1, perms[0], base_x + 1, base_y))
         y_delta = 1 << (size - 2)
-        queue.append((size - 1, perms[0], base_x + 1, base_y + y_delta))
+        queue.append((size - 1, perms[1], base_x + 1, base_y + y_delta))
 
     while queue:
         go(*queue.pop())
