@@ -14,9 +14,16 @@ class Choice(Enum):
 
 @dataclass
 class Routing:
-    depth: int
-    width: int
+    size: int
     choices: List[List[Optional[Choice]]]
+
+    @property
+    def width(self) -> int:
+        return 1 << (self.size - 1)
+
+    @property
+    def depth(self) -> int:
+        return 2 * self.size - 1
 
     @staticmethod
     def sized(size: int) -> "Routing":
@@ -29,7 +36,7 @@ class Routing:
         choices: List[List[Optional[Choice]]] = [
             [None for _ in range(width)] for _ in range(depth)
         ]
-        return Routing(depth, width, choices)
+        return Routing(size, choices)
 
 
 Permutation = Dict[int, int]
