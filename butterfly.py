@@ -1,7 +1,7 @@
 import random
 from dataclasses import dataclass
 from enum import Enum
-from typing import Dict, Iterator, List, Optional, Tuple
+from typing import Dict, Iterable, Iterator, List, Optional, Tuple
 
 SLATE = "#334155"
 PINK = "#EC4899"
@@ -62,7 +62,29 @@ class RoutingDrawer:
         return self._svg.output()
 
 
-Permutation = Dict[int, int]
+class Permutation:
+    def __init__(self, mapping: Iterable[Tuple[int, int]]):
+        self._forwards = {k: v for k, v in mapping}
+        self._backwards = {v: k for k, v in self._forwards.items()}
+
+    @staticmethod
+    def random(size: int) -> "Permutation":
+        count = 1 << size
+        numbers = list(range(count))
+        random.shuffle(numbers)
+        return Permutation(enumerate(numbers))
+
+    def __repr__(self):
+        return f'<Permutation {self._forwards}>'
+
+    def __eq__(self, other) -> bool:
+        return isinstance(other, Permutation) and self._forwards == other._forwards
+
+    def forwards(self, x: int) -> int:
+        return self._forwards[x]
+
+    def backwards(self, y: int) -> int:
+        return self._backwards[y]
 
 
 class Choice(Enum):
@@ -123,11 +145,10 @@ class Routing:
 
     def permutation(self) -> Permutation:
         xs = list(range(1 << self.size))
-        ys = xs[:]
-        for i, choice, a, b in self._ordered_choices():
+        for _, choice, a, b in self._ordered_choices():
             if choice == Choice.Swap:
-                ys[a], ys[b] = ys[b], ys[a]
-        return dict(zip(ys, xs))
+                xs[a], xs[b] = xs[b], xs[a]
+        return Permutation((v, k) for k, v in enumerate(xs))
 
     def draw_svg(self, node_diameter: float) -> str:
         drawer = RoutingDrawer(self.depth, 1 << self.size, node_diameter)
@@ -146,15 +167,6 @@ class Routing:
         return drawer.output()
 
 
-def random_permutation(size: int) -> Permutation:
-    """Generate a random permutation with 2^size elements.
-    """
-    count = 1 << size
-    numbers = list(range(count))
-    random.shuffle(numbers)
-    return dict(enumerate(numbers))
-
-
 def _choice_for(bot: int, hi: int) -> Choice:
     return Choice(bot ^ hi)
 
@@ -167,14 +179,15 @@ def route_permutation(size: int, permutation: Permutation) -> Routing:
 
     def go(size: int, permutation: Permutation, base_x: int, base_y: int):
         if size == 1:
-            choice = Choice.Pass if permutation[0] == 0 else Choice.Swap
+            choice = Choice.Pass if permutation.forwards(
+                0) == 0 else Choice.Swap
             routing.choices[base_x][base_y] = choice
             return
 
         e = 1 << (size - 1)
         mask = e - 1
 
-        perms: List[Permutation] = [dict(), dict()]
+        perms: List[Dict[int, int]] = [dict(), dict()]
 
         # First, assign a "color" (side) for each input node
         colors: Dict[int, int] = dict()
@@ -184,14 +197,14 @@ def route_permutation(size: int, permutation: Permutation) -> Routing:
                 colors[x] = 0
                 x ^= e
                 colors[x] = 1
-                x = permutation[e ^ permutation[x]]
+                x = permutation.backwards(e ^ permutation.forwards(x))
 
         # With these consistent colors, we can now just assign routes directly.
         for x in range(1 << size):
             x_hi = x >> (size - 1)
             x_lo = x & mask
 
-            y = permutation[x]
+            y = permutation.forwards(x)
             y_hi = y >> (size - 1)
             y_lo = y & mask
 
@@ -204,9 +217,13 @@ def route_permutation(size: int, permutation: Permutation) -> Routing:
             routing.choices[back][base_y + y_lo] = _choice_for(color, y_hi)
             perms[color][x_lo] = y_lo
 
-        queue.append((size - 1, perms[0], base_x + 1, base_y))
-        y_delta = 1 << (size - 2)
-        queue.append((size - 1, perms[1], base_x + 1, base_y + y_delta))
+        queue.append(
+            (size - 1, Permutation(perms[0].items()), base_x + 1, base_y)
+        )
+        queue.append(
+            (size - 1, Permutation(perms[1].items()),
+             base_x + 1, base_y + (1 << (size - 2)))
+        )
 
     while queue:
         go(*queue.pop())
@@ -216,7 +233,6 @@ def route_permutation(size: int, permutation: Permutation) -> Routing:
 
 def fuzz(size: int, rounds: int = 100):
     for _ in range(rounds):
-        perm0 = random_permutation(size)
+        perm0 = Permutation.random(size)
         perm1 = route_permutation(size, perm0).permutation()
-        print(perm0, perm1)
         assert perm0 == perm1
