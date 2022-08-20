@@ -179,8 +179,8 @@ def route_permutation(size: int, permutation: Permutation) -> Routing:
 
     def go(size: int, permutation: Permutation, base_x: int, base_y: int):
         if size == 1:
-            choice = Choice.Pass if permutation.forwards(
-                0) == 0 else Choice.Swap
+            swap = permutation.forwards(0) != 0
+            choice = Choice.Swap if swap else Choice.Pass
             routing.choices[base_x][base_y] = choice
             return
 
